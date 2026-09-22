@@ -12,6 +12,12 @@ export interface WeatherHourly {
   weather_code: number[];
 }
 
+export interface WeatherDaily {
+  time: string[];
+  sunrise: string[];
+  sunset: string[];
+}
+
 export interface MarineHourly {
   time: string[];
   wave_height: number[];
@@ -26,6 +32,7 @@ export interface WeatherResponse {
   timezone: string;
   hourly_units: Record<string, string>;
   hourly: WeatherHourly;
+  daily: WeatherDaily;
 }
 
 export interface MarineResponse {
@@ -55,6 +62,7 @@ export async function fetchWeather(lat: number, lon: number, days = 7): Promise<
       'wind_direction_10m',
       'weather_code',
     ].join(','),
+    daily: 'sunrise,sunset',
     wind_speed_unit: 'kn',
     timezone: 'auto',
     forecast_days: String(days),

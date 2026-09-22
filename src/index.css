@@ -6,3 +6,33 @@ html, body, #root { height: 100%; }
 body {
   @apply bg-slate-950 text-slate-100 font-sans antialiased;
 }
+
+/* Light (normal) mode overrides — applied when html does NOT have class="dark" */
+html:not(.dark) body {
+  @apply bg-slate-100 text-slate-900;
+}
+html:not(.dark) header {
+  @apply bg-white/80 border-slate-200;
+}
+html:not(.dark) .bg-slate-900\/50,
+html:not(.dark) .bg-slate-900\/60 {
+  background-color: rgba(255,255,255,0.9) !important;
+}
+html:not(.dark) .bg-slate-800\/60 {
+  background-color: rgb(226 232 240 / 0.7) !important; /* slate-200/70 */
+}
+html:not(.dark) .border-slate-800 {
+  border-color: rgb(203 213 225) !important; /* slate-300 */
+}
+html:not(.dark) .border-slate-800\/50,
+html:not(.dark) .border-slate-800\/60 {
+  border-color: rgb(203 213 225 / 0.6) !important;
+}
+html:not(.dark) .text-slate-100 { color: rgb(15 23 42) !important; }
+html:not(.dark) .text-slate-200 { color: rgb(30 41 59) !important; }
+html:not(.dark) .text-slate-300 { color: rgb(51 65 85) !important; }
+html:not(.dark) .text-slate-400 { color: rgb(71 85 105) !important; }
+html:not(.dark) .text-slate-500 { color: rgb(100 116 139) !important; }
+html:not(.dark) .text-slate-600 { color: rgb(100 116 139) !important; }
+html:not(.dark) .divide-slate-800 > * + * { border-color: rgb(203 213 225) !important; }
+html:not(.dark) footer { border-color: rgb(203 213 225) !important; }

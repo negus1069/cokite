@@ -53,7 +53,6 @@ export const SPOTS: Spot[] = [
     lat: 46.1555,
     lon: -1.2780,
     springRange: 6.0,
-    liveWind: RIVEDOUX_WEAMETER,
   },
   {
     slug: 'chatelaillon',
