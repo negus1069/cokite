@@ -1,8 +1,6 @@
-// Shared proxy strategies for fetching external endpoints from the browser.
-// Many public weather-station feeds don't set CORS headers; we work around
-// that in two ways:
-//   1. Local dev: Vite dev-server proxy (see `vite.config.ts`).
-//   2. Production (static GH Pages): fallback to public CORS proxies.
+// Fetch strategy:
+//   Dev  → Vite reverse proxy (no CORS issues)
+//   Prod → GitHub-hosted JSON/txt files updated every 5 min by a GH Actions workflow
 
 const isDev = import.meta.env.DEV;
 
@@ -11,11 +9,16 @@ const DEV_REWRITES: Array<{ from: string; to: string }> = [
   { from: 'https://www.meteolarochelle.fr', to: '/mlr' },
 ];
 
-/** Ordered list of public CORS proxies. First success wins. */
-const PUBLIC_PROXIES: Array<(url: string) => string> = [
-  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-  (url) => `https://thingproxy.freeboard.io/fetch/${url}`,
+// Maps upstream URLs to the pre-fetched static files served from /cokite/live/
+const STATIC_FILES: Array<{ from: string; to: string }> = [
+  {
+    from: 'https://weameter.com/stations/ilederekitesurf/windrt.json',
+    to: '/cokite/live/weameter-rivedoux.json',
+  },
+  {
+    from: 'https://www.meteolarochelle.fr/wdlchatel/clientraw.txt',
+    to: '/cokite/live/clientraw-chatelaillon.txt',
+  },
 ];
 
 export async function fetchViaProxy(url: string, init?: RequestInit): Promise<Response> {
@@ -26,20 +29,15 @@ export async function fetchViaProxy(url: string, init?: RequestInit): Promise<Re
       }
     }
   }
-  let lastErr: unknown;
-  for (const build of PUBLIC_PROXIES) {
-    try {
-      const target = build(url);
-      const res = await fetch(target, { cache: 'no-store', ...init });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+  // Production: serve from pre-fetched static files (no CORS needed)
+  for (const s of STATIC_FILES) {
+    if (url === s.from) {
+      const res = await fetch(s.to, { cache: 'no-store', ...init });
+      if (!res.ok) throw new Error(`Static live file not available (HTTP ${res.status})`);
       return res;
-    } catch (e) {
-      lastErr = e;
     }
   }
-  throw new Error(
-    `Impossible d'atteindre ${url} via un proxy CORS (${
-      lastErr instanceof Error ? lastErr.message : lastErr
-    })`,
-  );
+
+  throw new Error(`No proxy configured for ${url}`);
 }
