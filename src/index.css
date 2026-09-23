@@ -4,7 +4,7 @@
 
 html, body, #root { height: 100%; }
 body {
-  @apply bg-slate-950 text-slate-100 font-sans antialiased;
+  @apply bg-white text-slate-900 font-sans antialiased;
 }
 
 /* Light (normal) mode overrides — applied when html does NOT have class="dark" */
@@ -15,8 +15,9 @@ html:not(.dark) header {
   @apply bg-white/80 border-slate-200;
 }
 html:not(.dark) .bg-slate-900\/50,
-html:not(.dark) .bg-slate-900\/60 {
-  background-color: rgba(255,255,255,0.9) !important;
+html:not(.dark) .bg-slate-900\/60,
+html:not(.dark) .bg-slate-900 {
+  background-color: rgb(255 255 255) !important;
 }
 html:not(.dark) .bg-slate-800\/60 {
   background-color: rgb(226 232 240 / 0.7) !important; /* slate-200/70 */
@@ -36,3 +37,29 @@ html:not(.dark) .text-slate-500 { color: rgb(100 116 139) !important; }
 html:not(.dark) .text-slate-600 { color: rgb(100 116 139) !important; }
 html:not(.dark) .divide-slate-800 > * + * { border-color: rgb(203 213 225) !important; }
 html:not(.dark) footer { border-color: rgb(203 213 225) !important; }
+
+/* Sticky label column background — adapts to theme */
+.sticky-label-col {
+  background-color: rgb(15 23 42) !important; /* slate-900 dark */
+  box-shadow: 2px 0 4px -1px rgba(0,0,0,0.15);
+  z-index: 10;
+}
+html:not(.dark) .sticky-label-col {
+  background-color: rgb(255 255 255) !important;
+  box-shadow: 2px 0 4px -1px rgba(0,0,0,0.08);
+}
+
+/* Force sticky td to always paint on top of inline-styled siblings */
+table tbody tr > td:first-child.sticky-label-col,
+table tbody tr > td.sticky-label-col,
+table thead tr > th.sticky-label-col {
+  position: sticky !important;
+  left: 0 !important;
+  z-index: 20 !important;
+  background-color: rgb(15 23 42) !important;
+}
+html:not(.dark) table tbody tr > td:first-child.sticky-label-col,
+html:not(.dark) table tbody tr > td.sticky-label-col,
+html:not(.dark) table thead tr > th.sticky-label-col {
+  background-color: rgb(255 255 255) !important;
+}

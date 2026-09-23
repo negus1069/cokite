@@ -13,10 +13,6 @@ interface Props {
   svgHeight?: number;
 }
 
-function fmtLabel(iso: string): string {
-  return iso.slice(11, 16);
-}
-
 function catmullRomPath(points: { x: number; y: number }[]): string {
   if (points.length < 2) return '';
   let d = `M ${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
@@ -41,7 +37,7 @@ export default function TideChart({
   hours,
   colWidth,
   context = 2,
-  svgHeight = 80,
+  svgHeight = 40,
 }: Props) {
   if (hours.length === 0) return null;
 
@@ -97,8 +93,8 @@ export default function TideChart({
   const range = maxH - minH || 1;
   const meanH = (minH + maxH) / 2;
 
-  const PAD_TOP = 18;
-  const PAD_BOTTOM = 6;
+  const PAD_TOP = 12;
+  const PAD_BOTTOM = 4;
   const chartH = svgHeight - PAD_TOP - PAD_BOTTOM;
 
   function yFor(h: number): number {
@@ -120,9 +116,15 @@ export default function TideChart({
 
   const uid = `tc-${date}`;
 
-  // Extrema labels
+  // Extrema labels — only those within the visible column range
   const allExtrema = findExtrema(times, heights, 3);
-  const todayExtrema = allExtrema.filter((e) => e.time.startsWith(date));
+  const visibleExtrema = allExtrema.filter((e) => {
+    if (!e.time.startsWith(date)) return false;
+    const hh = parseInt(e.time.slice(11, 13), 10);
+    const mm = parseInt(e.time.slice(14, 16), 10);
+    const x = xForHour(hh + mm / 60);
+    return x >= 0 && x <= totalWidth;
+  });
 
   return (
     <svg
@@ -168,22 +170,29 @@ export default function TideChart({
       {/* Curve */}
       <path d={linePath} fill="none" stroke="currentColor" strokeWidth={1.5} strokeOpacity={0.75} />
 
-      {/* Extrema labels — only for today */}
-      {todayExtrema.map((e) => {
+      {/* Extrema labels — only for today, within visible range */}
+      {visibleExtrema.map((e) => {
         const hh = parseInt(e.time.slice(11, 13), 10);
         const mm = parseInt(e.time.slice(14, 16), 10);
         const absH = hh + mm / 60;
         const x = xForHour(absH);
         const y = yFor(e.height);
         const isPM = e.kind === 'PM';
-        const labelY = isPM ? Math.max(9, y - 4) : Math.min(svgHeight - 2, y + 13);
-        const color = isPM ? 'rgb(134 239 172)' : 'rgb(252 165 165)';
+        const color = isPM ? 'rgb(22 101 52)' : 'rgb(153 27 27)';
+        const heightTxt = `${e.height.toFixed(1)}m`;
+        const timeTxt = `${String(hh).padStart(2,'0')}h${String(mm).padStart(2,'0')}`;
+        // For PM: labels above the dot; for BM: labels below
+        const baseY = isPM ? Math.max(10, y - 5) : Math.min(svgHeight - 2, y + 9);
         return (
           <g key={e.index}>
             <circle cx={x} cy={y} r={2.5} fill={color} />
-            <text x={x} y={labelY} textAnchor="middle" fontSize={9}
-              fill={color} fontFamily="Inter,system-ui,sans-serif" fontWeight={600}>
-              {fmtLabel(e.time)}
+            <text x={x} y={baseY} textAnchor="middle" fontSize={8}
+              fill={color} fontFamily="Inter,system-ui,sans-serif" fontWeight={700}>
+              {heightTxt}
+            </text>
+            <text x={x} y={isPM ? baseY - 9 : baseY + 9} textAnchor="middle" fontSize={7}
+              fill={color} fontFamily="Inter,system-ui,sans-serif" fontWeight={500} opacity={0.8}>
+              {timeTxt}
             </text>
           </g>
         );

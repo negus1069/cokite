@@ -83,7 +83,7 @@ export default function LiveWindBadge({ source, stationName }: Props) {
 
   if (q.isLoading) {
     return (
-      <div className="rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-xs text-slate-400">
+      <div className="rounded-lg border border-slate-700/40 px-3 py-2 text-xs text-slate-400">
         📡 Connexion à la station…
       </div>
     );
@@ -91,7 +91,7 @@ export default function LiveWindBadge({ source, stationName }: Props) {
 
   if (q.error || !q.data?.hasData) {
     return (
-      <div className="rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-xs text-slate-400">
+      <div className="rounded-lg border border-slate-700/40 px-3 py-2 text-xs text-slate-400">
         📡 Station hors ligne
       </div>
     );
@@ -116,67 +116,47 @@ export default function LiveWindBadge({ source, stationName }: Props) {
 
   return (
     <div
-      className="rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-xs flex flex-wrap items-center gap-x-3 gap-y-1"
+      className="rounded-lg border border-slate-700/40 px-3 py-1.5 text-xs flex items-center gap-x-2.5 whitespace-nowrap overflow-hidden"
       title={`Station ${stationName ?? ''} · lecture il y a ${ageLabel}`}
     >
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 shrink-0">
         <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-        <span className="text-emerald-300 font-medium">LIVE</span>
+        <span className="text-emerald-600 font-medium">LIVE</span>
       </div>
-      <div className="flex items-center gap-1">
-        <WindArrow deg={d.directionDeg} className="text-slate-200" size={16} />
-        <span className="text-slate-300">
-          {degToCardinal(d.directionDeg)} · {Math.round(d.directionDeg)}°
-        </span>
+      <div className="flex items-center gap-1 shrink-0">
+        <WindArrow deg={d.directionDeg} className="text-slate-200" size={14} />
+        <span className="text-slate-300">{degToCardinal(d.directionDeg)} · {Math.round(d.directionDeg)}°</span>
       </div>
-      <div className="flex items-center gap-1">
-        <span className="text-slate-500">vent</span>
-        <span
-          className="px-2 py-0.5 rounded font-semibold"
-          style={{ backgroundColor: st.backgroundColor, color: st.color }}
-        >
-          {fmtNum(d.speedKts, 0)} kts
-        </span>
-      </div>
-      <div className="text-slate-400">
+      <span className="text-slate-500 shrink-0">vent</span>
+      <span
+        className="px-2 py-0.5 rounded font-semibold shrink-0"
+        style={{ backgroundColor: st.backgroundColor, color: st.color }}
+      >
+        {fmtNum(d.speedKts, 0)} kts
+      </span>
+      <span className="text-slate-400 shrink-0">
         raf. <span className="text-slate-200 font-medium">{fmtNum(d.gustKts, 0)}</span>
-      </div>
-
+      </span>
       {avg1h !== undefined && stAvg && (
-        <div className="flex items-center gap-1">
-          <span className="text-slate-500">moy. {avgTag}</span>
+        <>
+          <span className="text-slate-500 shrink-0">moy. {avgTag}</span>
           <span
-            className="px-2 py-0.5 rounded font-semibold"
+            className="px-2 py-0.5 rounded font-semibold shrink-0"
             style={{ backgroundColor: stAvg.backgroundColor, color: stAvg.color }}
           >
             {fmtNum(avg1h, 0)}
           </span>
           {gmax1h !== undefined && (
-            <span className="text-slate-500">
-              (raf.max <span className="text-slate-200 font-medium">{fmtNum(gmax1h, 0)}</span>)
+            <span className="text-slate-500 shrink-0">
+              raf.max <span className="text-slate-200 font-medium">{fmtNum(gmax1h, 0)}</span>
             </span>
           )}
-        </div>
+        </>
       )}
-
-      <div className="text-slate-400 flex items-center gap-1">
-        <span>🕒</span>
-        <span className="text-slate-200">
-          {d.timestamp.toLocaleTimeString('fr-FR', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-          })}
-        </span>
-        <span className="text-slate-500">
-          · {d.timestamp.toLocaleDateString('fr-FR', {
-            weekday: 'short',
-            day: 'numeric',
-            month: 'short',
-          })}
-        </span>
-        <span className="text-slate-600">(il y a {ageLabel})</span>
-      </div>
+      <span className="text-slate-500 shrink-0">
+        {d.timestamp.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+        <span className="text-slate-600 ml-1">({ageLabel})</span>
+      </span>
     </div>
   );
 }

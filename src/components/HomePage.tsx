@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { SPOTS, type Spot } from '../data/spots';
 import { fetchWeather, fetchMarine, type WeatherResponse } from '../api/openMeteo';
 import { findExtrema, coefficientForDay } from '../lib/tideMath';
-import { windStyle, tempStyle, waveStyle, degToCardinal, fmtNum } from '../lib/format';
+import { windStyle, tempStyle, waveStyle, periodStyle, degToCardinal, fmtNum } from '../lib/format';
 import { cloudEmoji } from '../lib/weatherCode';
 import WindArrow from './WindArrow';
 import LiveWindBadge from './LiveWindBadge';
@@ -14,9 +14,24 @@ const REF = SPOTS[0];
 // Hourly columns: 8h–20h
 const HOURS = Array.from({ length: 13 }, (_, i) => i + 8); // 8..20
 
+// Column width in px (27 ≈ 38 × 0.7)
+const COL_W = 27;
+
 function todayISO(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function addDays(isoDate: string, n: number): string {
+  const d = new Date(`${isoDate}T12:00:00`);
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function shortDateLabel(isoDate: string): string {
+  return new Date(`${isoDate}T12:00:00`).toLocaleDateString('fr-FR', {
+    weekday: 'short', day: 'numeric', month: 'short',
+  });
 }
 
 function getSunset(weather: WeatherResponse, isoDate: string): string | null {
@@ -25,8 +40,24 @@ function getSunset(weather: WeatherResponse, isoDate: string): string | null {
   return weather.daily.sunset[idx].slice(11, 16).replace(':', 'h');
 }
 
+function getSunrise(weather: WeatherResponse, isoDate: string): string | null {
+  const idx = weather.daily?.time.indexOf(isoDate);
+  if (idx == null || idx < 0) return null;
+  return weather.daily.sunrise[idx].slice(11, 16).replace(':', 'h');
+}
+
 function idxFor(times: string[], date: string, hour: number): number {
   return times.indexOf(`${date}T${String(hour).padStart(2, '0')}:00`);
+}
+
+interface ColSpec { hour: number; date: string; iW: number; iM: number; }
+
+// Wind is offshore when it blows away from shore:
+// wind direction is roughly opposite to the spot's facing direction (within 90°).
+function isOffshore(windDeg: number, facingDeg: number): boolean {
+  const offshoreDeg = (facingDeg + 180) % 360;
+  const diff = Math.abs(((windDeg - offshoreDeg + 540) % 360) - 180);
+  return diff <= 90;
 }
 
 interface Props {
@@ -35,6 +66,7 @@ interface Props {
 
 export default function HomePage({ onSelectSpot }: Props) {
   const today = useMemo(todayISO, []);
+  const days = useMemo(() => [today, addDays(today, 1), addDays(today, 2)], [today]);
 
   const weatherQ = useQuery({
     queryKey: ['weather', REF.lat, REF.lon],
@@ -49,101 +81,122 @@ export default function HomePage({ onSelectSpot }: Props) {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   });
 
-  const tideInfo = useMemo(() => {
-    if (!marineQ.data) return null;
+  const tideInfoByDay = useMemo(() => {
+    if (!marineQ.data) return {};
     const { time, sea_level_height_msl } = marineQ.data.hourly;
     const extrema = findExtrema(time, sea_level_height_msl);
-    const todayExtrema = extrema.filter((e) => e.time.startsWith(today));
-    const coef = coefficientForDay(time, sea_level_height_msl, today, REF.springRange);
-    return { extrema: todayExtrema, coef };
-  }, [marineQ.data, today]);
+    return Object.fromEntries(days.map((d) => [
+      d,
+      {
+        extrema: extrema.filter((e) => e.time.startsWith(d)),
+        coef: coefficientForDay(time, sea_level_height_msl, d, REF.springRange),
+      },
+    ]));
+  }, [marineQ.data, days]);
 
   const sunset = useMemo(() => {
     if (!weatherQ.data) return null;
     return getSunset(weatherQ.data, today);
   }, [weatherQ.data, today]);
 
+  const sunrise = useMemo(() => {
+    if (!weatherQ.data) return null;
+    return getSunrise(weatherQ.data, today);
+  }, [weatherQ.data, today]);
+
   const loading = weatherQ.isLoading || marineQ.isLoading;
   const wt = weatherQ.data?.hourly;
   const mt = marineQ.data?.hourly;
 
-  // Column indices into hourly arrays for each display hour
-  const cols = HOURS.map((h) => ({
-    hour: h,
-    iW: wt ? idxFor(wt.time, today, h) : -1,
-    iM: mt ? idxFor(mt.time, today, h) : -1,
-  }));
+  // All columns across 3 days
+  const allCols: ColSpec[] = useMemo(() =>
+    days.flatMap((d) =>
+      HOURS.map((h) => ({
+        hour: h,
+        date: d,
+        iW: wt ? idxFor(wt.time, d, h) : -1,
+        iM: mt ? idxFor(mt.time, d, h) : -1,
+      }))
+    ),
+    [days, wt, mt]
+  );
 
   // Shared label column width
   const LABEL_W = 'w-28 min-w-[7rem]';
+  const totalDataCols = HOURS.length * days.length;
 
   return (
     <div className="space-y-5">
       {/* Date + tide header */}
-      <div className="flex items-baseline gap-4">
+      <div className="flex items-center gap-6 flex-wrap">
         <h2 className="text-2xl font-bold capitalize">{dateLabel}</h2>
+        {sunrise && <SunWidget type="rise" time={sunrise} />}
+        {sunset && <SunWidget type="set" time={sunset} />}
         {loading && <span className="text-sm text-slate-400">Chargement…</span>}
       </div>
 
-      {/* Tide info strip */}
-      <div className="flex flex-wrap items-center gap-3 bg-slate-900/60 border border-slate-800 rounded-lg px-4 py-3 text-sm">
-        <span className="text-slate-400 text-xs uppercase tracking-wider mr-1">Rivedoux</span>
-        {tideInfo ? (
-          <>
-            {tideInfo.coef !== null && (
-              <span className="px-2.5 py-0.5 rounded font-bold text-xs text-amber-900 bg-amber-400">
-                Coef {tideInfo.coef}
-              </span>
-            )}
-            {tideInfo.extrema.map((e) => {
-              const hm = e.time.slice(11, 16).replace(':', 'h');
-              const isPM = e.kind === 'PM';
-              return (
-                <span key={e.index} className={`px-2 py-0.5 rounded text-xs font-medium ${isPM ? 'bg-emerald-900/60 text-emerald-300' : 'bg-cyan-900/60 text-cyan-300'}`}>
-                  {hm} {e.kind} · {fmtNum(e.height, 1)}m
-                </span>
-              );
-            })}
-          </>
-        ) : <span className="text-slate-500 text-xs">Marées —</span>}
-        {sunset
-          ? <span className="ml-auto flex items-center gap-1 text-orange-300 text-sm"><span>🌇</span><span className="font-medium">{sunset}</span></span>
-          : <span className="ml-auto text-slate-500">🌇 —</span>}
-      </div>
-
       {/* Unified table */}
-      <div className="bg-slate-900/50 border border-slate-800 rounded-lg overflow-x-auto">
-        <table className="text-slate-100 border-separate border-spacing-0 text-xs" style={{ minWidth: '700px', width: '100%' }}>
+      <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-x-auto">
+        <table className="text-slate-100 border-collapse text-xs bg-slate-900" style={{ minWidth: `${7 * 16 + totalDataCols * COL_W}px`, width: '100%' }}>
           <thead>
+            {/* Day header row */}
             <tr>
-              <th className={`${LABEL_W} text-left font-normal text-slate-500 pl-3 pr-2 pb-2 pt-3`}></th>
-              {HOURS.map((h) => (
-                <th key={h} className="text-[11px] font-semibold text-slate-300 pb-2 pt-3 text-center" style={{ minWidth: '38px' }}>
-                  {String(h).padStart(2, '0')}h
+              <th className={`${LABEL_W} sticky left-0 z-10 sticky-label-col`}></th>
+              {days.map((d) => (
+                <th
+                  key={d}
+                  colSpan={HOURS.length}
+                  className="text-[11px] font-semibold text-slate-300 pb-1 pt-2 text-center border-l border-slate-700/50 capitalize"
+                >
+                  {shortDateLabel(d)}
                 </th>
               ))}
             </tr>
+            {/* Hour row */}
+            <tr>
+              <th className={`${LABEL_W} text-left font-normal text-slate-500 pl-3 pr-2 pb-2 sticky left-0 z-10 sticky-label-col`}></th>
+              {days.flatMap((d) =>
+                HOURS.map((h, hi) => (
+                  <th
+                    key={`${d}-${h}`}
+                    className={`text-[11px] font-semibold text-slate-300 pb-2 text-center${hi === 0 ? ' border-l border-slate-700/50' : ''}`}
+                    style={{ minWidth: `${COL_W}px` }}
+                  >
+                    {String(h).padStart(2, '0')}h
+                  </th>
+                ))
+              )}
+            </tr>
           </thead>
-          <tbody className={`[&_tr>td:first-child]:pl-3 [&_tr>td:first-child]:pr-2 [&_tr>td:first-child]:text-left [&_tr>td:first-child]:whitespace-nowrap [&_tr>td:first-child]:${LABEL_W}`}>
+          <tbody className={`[&_tr>td:first-child]:pl-3 [&_tr>td:first-child]:pr-2 [&_tr>td:first-child]:text-left [&_tr>td:first-child]:whitespace-nowrap [&_tr>td:first-child]:${LABEL_W} [&_tr>td:first-child]:sticky [&_tr>td:first-child]:left-0 [&_tr>td:first-child]:z-10 [&_tr>td:first-child]:sticky-label-col`}>
 
             {/* ── SHARED ROWS ── */}
-            {/* Tide chart spanning all columns */}
+            {/* Tide charts — one per day */}
             {mt && (
               <tr>
-                <td className="py-1 text-slate-400">Marée</td>
-                <td colSpan={HOURS.length} className="p-0">
-                  <div className="text-slate-300">
+                <td className="py-1 text-slate-400">
+                  <div className="flex items-center gap-1.5">
+                    <span>Marée</span>
+                    {tideInfoByDay[today]?.coef != null && (
+                      <span className="px-1.5 py-0.5 rounded font-bold text-[10px] text-amber-900 bg-amber-400 whitespace-nowrap">
+                        Coef {tideInfoByDay[today].coef}
+                      </span>
+                    )}
+                  </div>
+                </td>
+                {days.map((d, di) => (
+                  <td key={d} colSpan={HOURS.length} className={`p-0${di > 0 ? ' border-l border-slate-700/50' : ''}`}>
                     <TideChart
                       times={mt.time}
                       heights={mt.sea_level_height_msl}
-                      date={today}
+                      date={d}
                       hours={HOURS}
-                      colWidth={40}
+                      colWidth={COL_W}
                       context={2}
                       svgHeight={80}
                     />
-                  </div>
-                </td>
+                  </td>
+                ))}
               </tr>
             )}
 
@@ -151,8 +204,8 @@ export default function HomePage({ onSelectSpot }: Props) {
             {wt && (
               <tr className="border-t border-slate-800/60">
                 <td className="py-1 text-slate-400">Nuages</td>
-                {cols.map(({ hour, iW }) => (
-                  <td key={hour} className="px-0.5 py-1 text-center">
+                {allCols.map(({ hour, date, iW }, ci) => (
+                  <td key={`${date}-${hour}`} className={`px-0.5 py-1 text-center${ci % HOURS.length === 0 && ci > 0 ? ' border-l border-slate-700/50' : ''}`}>
                     {iW >= 0 ? <span className="text-lg" title={`${Math.round(wt.cloud_cover[iW])}%`}>{cloudEmoji(wt.cloud_cover[iW])}</span> : '—'}
                   </td>
                 ))}
@@ -163,19 +216,13 @@ export default function HomePage({ onSelectSpot }: Props) {
             {wt && (
               <tr>
                 <td className="py-0 text-slate-400">Temp (°C)</td>
-                {cols.map(({ hour, iW }) => {
-                  if (iW < 0) return <td key={hour} />;
+                {allCols.map(({ hour, date, iW }, ci) => {
+                  const borderClass = ci % HOURS.length === 0 && ci > 0 ? ' border-l border-slate-700/50' : '';
+                  if (iW < 0) return <td key={`${date}-${hour}`} className={borderClass} />;
                   const st = tempStyle(wt.temperature_2m[iW]);
                   return (
-                    <td key={hour} className="align-bottom p-0 bg-slate-800/60">
-                      <div className="relative h-8 overflow-hidden">
-                        <div
-                          className="absolute bottom-0 left-0 right-0 flex items-start justify-center pt-0.5 text-[10px] font-semibold leading-none text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.7)]"
-                          style={{ height: `${st.heightPct}%`, backgroundColor: st.backgroundColor }}
-                        >
-                          {fmtNum(wt.temperature_2m[iW], 0)}
-                        </div>
-                      </div>
+                    <td key={`${date}-${hour}`} className={`p-0 text-center text-[10px] font-semibold${borderClass}`} style={{ backgroundColor: st.backgroundColor, color: '#1e293b' }}>
+                      <div className="py-1">{fmtNum(wt.temperature_2m[iW], 0)}</div>
                     </td>
                   );
                 })}
@@ -187,7 +234,8 @@ export default function HomePage({ onSelectSpot }: Props) {
               <SpotRows
                 key={spot.slug}
                 spot={spot}
-                cols={cols}
+                allCols={allCols}
+                hours={HOURS}
                 wt={wt}
                 mt={mt}
                 onSelect={() => onSelectSpot(spot)}
@@ -202,24 +250,29 @@ export default function HomePage({ onSelectSpot }: Props) {
 
 // ---------- SpotRows ----------
 
-interface ColSpec { hour: number; iW: number; iM: number; }
-
 // Simpler typed version
-function SpotRows({ spot, cols, wt, mt, onSelect }: {
+function SpotRows({ spot, allCols, hours, wt, mt, onSelect }: {
   spot: Spot;
-  cols: ColSpec[];
+  allCols: ColSpec[];
+  hours: number[];
   wt: { time: string[]; wind_direction_10m: number[]; wind_speed_10m: number[]; wind_gusts_10m: number[] } | undefined;
-  mt: { time: string[]; wave_height: number[]; wave_period: number[] } | undefined;
+  mt: { time: string[]; wave_height: number[]; wave_direction: number[]; wave_period: number[] } | undefined;
   onSelect: () => void;
 }) {
-  const N = cols.length;
+  const N = allCols.length;
+  const { facingDeg } = spot;
+
+  function borderCls(ci: number) {
+    return ci % hours.length === 0 && ci > 0 ? ' border-l border-slate-700/50' : '';
+  }
 
   return (
     <>
       {/* Spot header row */}
       <tr className="border-t-2 border-slate-700">
-        <td colSpan={N + 1} className="py-0">
-          <div className="flex items-center gap-3 px-0 py-2">
+        {/* Sticky label cell: spot name + détail link */}
+        <td className="pt-3 pb-0 pl-3 pr-2 sticky left-0 z-10 sticky-label-col whitespace-nowrap">
+          <div className="flex items-center gap-1.5 py-2">
             <button
               onClick={onSelect}
               className="font-semibold text-slate-100 hover:underline focus:outline-none text-sm"
@@ -227,12 +280,15 @@ function SpotRows({ spot, cols, wt, mt, onSelect }: {
               {spot.name}
             </button>
             <span className="text-slate-600 text-xs">→ Détail</span>
-            {spot.liveWind && (
-              <div className="ml-2">
-                <LiveWindBadge source={spot.liveWind} stationName={spot.name} />
-              </div>
-            )}
           </div>
+        </td>
+        {/* Remaining columns: live badge floated left, rest empty */}
+        <td colSpan={N} className="pt-3 pb-0 sticky-label-col">
+          {spot.liveWind && (
+            <div className="py-2 pl-1">
+              <LiveWindBadge source={spot.liveWind} stationName={spot.name} />
+            </div>
+          )}
         </td>
       </tr>
 
@@ -240,12 +296,18 @@ function SpotRows({ spot, cols, wt, mt, onSelect }: {
       {wt && (
         <tr>
           <td className="py-1 text-slate-400">Dir. vent</td>
-          {cols.map(({ hour, iW }) => (
-            <td key={hour} className="text-center py-0.5">
+          {allCols.map(({ hour, date, iW }, ci) => (
+            <td key={`${date}-${hour}`} className={`text-center py-0.5${borderCls(ci)}`}>
               {iW >= 0 ? (
                 <div className="flex flex-col items-center">
-                  <WindArrow deg={wt.wind_direction_10m[iW]} className="text-slate-200" size={14} />
-                  <span className="text-[9px] text-slate-500">{degToCardinal(wt.wind_direction_10m[iW])}</span>
+                  {(() => {
+                    const deg = wt.wind_direction_10m[iW];
+                    const off = isOffshore(deg, facingDeg);
+                    return <>
+                      <WindArrow deg={deg} className={off ? 'text-red-500' : 'text-slate-500'} size={14} />
+                      <span className={`text-[9px] ${off ? 'text-red-400' : 'text-slate-500'}`}>{degToCardinal(deg)}</span>
+                    </>;
+                  })()}
                 </div>
               ) : '—'}
             </td>
@@ -257,21 +319,14 @@ function SpotRows({ spot, cols, wt, mt, onSelect }: {
       {wt && (
         <tr>
           <td className="py-0 text-slate-400">Vent (kts)</td>
-          {cols.map(({ hour, iW }) => {
-            if (iW < 0) return <td key={hour} />;
+          {allCols.map(({ hour, date, iW }, ci) => {
+            const bc = borderCls(ci);
+            if (iW < 0) return <td key={`${date}-${hour}`} className={bc} />;
             const v = wt.wind_speed_10m[iW];
             const st = windStyle(v);
-            const h = Math.max(20, Math.min(100, (v / 40) * 100));
             return (
-              <td key={hour} className="align-bottom p-0 bg-slate-800/60">
-                <div className="relative h-8 overflow-hidden">
-                  <div
-                    className="absolute bottom-0 left-0 right-0 flex items-start justify-center pt-0.5 text-[10px] font-semibold leading-none text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.7)]"
-                    style={{ height: `${h}%`, backgroundColor: st.backgroundColor }}
-                  >
-                    {fmtNum(v, 0)}
-                  </div>
-                </div>
+              <td key={`${date}-${hour}`} className={`p-0 text-center text-[10px] font-semibold${bc}`} style={{ backgroundColor: st.backgroundColor, color: st.color }}>
+                <div className="py-1">{fmtNum(v, 0)}</div>
               </td>
             );
           })}
@@ -282,52 +337,49 @@ function SpotRows({ spot, cols, wt, mt, onSelect }: {
       {wt && (
         <tr>
           <td className="py-0 text-slate-400">Rafale (kts)</td>
-          {cols.map(({ hour, iW }) => {
-            if (iW < 0) return <td key={hour} />;
+          {allCols.map(({ hour, date, iW }, ci) => {
+            const bc = borderCls(ci);
+            if (iW < 0) return <td key={`${date}-${hour}`} className={bc} />;
             const v = wt.wind_gusts_10m[iW];
             const st = windStyle(v);
-            const h = Math.max(20, Math.min(100, (v / 40) * 100));
             return (
-              <td key={hour} className="align-bottom p-0 bg-slate-800/60">
-                <div className="relative h-8 overflow-hidden">
-                  <div
-                    className="absolute bottom-0 left-0 right-0 flex items-start justify-center pt-0.5 text-[10px] font-semibold leading-none text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.7)]"
-                    style={{ height: `${h}%`, backgroundColor: st.backgroundColor }}
-                  >
-                    {fmtNum(v, 0)}
-                  </div>
-                </div>
+              <td key={`${date}-${hour}`} className={`p-0 text-center text-[10px] font-semibold${bc}`} style={{ backgroundColor: st.backgroundColor, color: st.color }}>
+                <div className="py-1">{fmtNum(v, 0)}</div>
               </td>
             );
           })}
         </tr>
       )}
 
+      {/* Direction houle */}
+      {mt && (
+        <tr>
+          <td className="py-1 text-slate-400">Dir. houle</td>
+          {allCols.map(({ hour, date, iM }, ci) => (
+            <td key={`${date}-${hour}`} className={`text-center py-0.5${borderCls(ci)}`}>
+              {iM >= 0 ? (
+                <div className="flex flex-col items-center">
+                  <WindArrow deg={mt.wave_direction[iM]} className="text-cyan-400" size={14} />
+                  <span className="text-[9px] text-slate-500">{degToCardinal(mt.wave_direction[iM])}</span>
+                </div>
+              ) : '—'}
+            </td>
+          ))}
+        </tr>
+      )}
+
       {/* Vagues */}
       {mt && (
         <tr>
-          <td className="py-0 text-cyan-300/70">Vagues (m)</td>
-          {cols.map(({ hour, iM }) => {
-            if (iM < 0) return <td key={hour} />;
+          <td className="py-0 text-slate-400">Vagues (m)</td>
+          {allCols.map(({ hour, date, iM }, ci) => {
+            const bc = borderCls(ci);
+            if (iM < 0) return <td key={`${date}-${hour}`} className={bc} />;
             const v = mt.wave_height[iM];
             const st = waveStyle(v);
-            const label = fmtNum(v, 1);
-            const short = st.heightPct < 35;
             return (
-              <td key={hour} className="align-bottom p-0 bg-slate-800/60">
-                <div className="relative h-8 overflow-hidden">
-                  {short && (
-                    <div className="absolute top-0 left-0 right-0 flex justify-center text-[10px] font-semibold text-slate-200 pt-0.5">
-                      {label}
-                    </div>
-                  )}
-                  <div
-                    className="absolute bottom-0 left-0 right-0 flex items-start justify-center pt-0.5 text-[10px] font-semibold leading-none text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.7)]"
-                    style={{ height: `${st.heightPct}%`, backgroundColor: st.backgroundColor }}
-                  >
-                    {!short && label}
-                  </div>
-                </div>
+              <td key={`${date}-${hour}`} className={`p-0 text-center text-[10px] font-semibold${bc}`} style={{ backgroundColor: st.backgroundColor, color: '#1e293b' }}>
+                <div className="py-1">{fmtNum(v, 1)}</div>
               </td>
             );
           })}
@@ -338,13 +390,65 @@ function SpotRows({ spot, cols, wt, mt, onSelect }: {
       {mt && (
         <tr>
           <td className="py-1 pb-2 text-slate-400">Période (s)</td>
-          {cols.map(({ hour, iM }) => (
-            <td key={hour} className="text-center py-1 text-slate-300">
-              {iM >= 0 && Number.isFinite(mt.wave_period[iM]) ? `${fmtNum(mt.wave_period[iM], 0)}s` : '—'}
-            </td>
-          ))}
+          {allCols.map(({ hour, date, iM }, ci) => {
+            const bc = borderCls(ci);
+            if (iM < 0 || !Number.isFinite(mt.wave_period[iM])) return <td key={`${date}-${hour}`} className={`text-center py-1 text-slate-500${bc}`}>—</td>;
+            const v = mt.wave_period[iM];
+            const st = periodStyle(v);
+            return (
+              <td key={`${date}-${hour}`} className={`p-0 text-center text-[10px] font-semibold${bc}`} style={{ backgroundColor: st.backgroundColor, color: st.color }}>
+                <div className="py-1">{fmtNum(v, 0)}s</div>
+              </td>
+            );
+          })}
         </tr>
       )}
     </>
+  );
+}
+
+// ---------- SunWidget ----------
+
+function SunWidget({ type, time }: { type: 'rise' | 'set'; time: string }) {
+  const isRise = type === 'rise';
+  return (
+    <div className="flex items-center gap-2">
+      <svg width="44" height="36" viewBox="0 0 44 36" fill="none" aria-hidden>
+        {/* Sky glow */}
+        <ellipse cx="22" cy="28" rx="20" ry="10"
+          fill={isRise ? 'url(#sky-rise)' : 'url(#sky-set)'} opacity="0.5" />
+        {/* Horizon line */}
+        <line x1="2" y1="28" x2="42" y2="28" stroke="#cbd5e1" strokeWidth="1" strokeOpacity="0.4" />
+        {/* Sun body */}
+        <circle cx="22" cy={isRise ? 20 : 24} r="8"
+          fill={isRise ? 'url(#sun-rise)' : 'url(#sun-set)'} />
+        {/* Arrow */}
+        {isRise
+          ? <polygon points="22,6 18,12 26,12" fill="#60a5fa" />
+          : <polygon points="22,34 18,28 26,28" fill="#f97316" />}
+        <defs>
+          <radialGradient id="sky-rise" cx="50%" cy="80%" r="60%">
+            <stop offset="0%" stopColor="#fef9c3" />
+            <stop offset="100%" stopColor="#bfdbfe" />
+          </radialGradient>
+          <radialGradient id="sky-set" cx="50%" cy="80%" r="60%">
+            <stop offset="0%" stopColor="#fed7aa" />
+            <stop offset="100%" stopColor="#fecaca" />
+          </radialGradient>
+          <radialGradient id="sun-rise" cx="40%" cy="40%" r="60%">
+            <stop offset="0%" stopColor="#fef08a" />
+            <stop offset="100%" stopColor="#f59e0b" />
+          </radialGradient>
+          <radialGradient id="sun-set" cx="40%" cy="40%" r="60%">
+            <stop offset="0%" stopColor="#fde68a" />
+            <stop offset="100%" stopColor="#ea580c" />
+          </radialGradient>
+        </defs>
+      </svg>
+      <div className="text-xs leading-tight">
+        <div className="text-slate-400">{isRise ? 'Lever' : 'Coucher'}</div>
+        <div className="font-semibold text-slate-200 text-sm">{time.replace('h', ':')}</div>
+      </div>
+    </div>
   );
 }

@@ -27,7 +27,7 @@ export default function App() {
   const [spot, setSpot] = useState<Spot>(SPOTS[0]);
   const [date, setDate] = useState<string>(todayISO());
   const [isDark, setIsDark] = useState<boolean>(
-    () => localStorage.getItem('theme') !== 'light',
+    () => localStorage.getItem('theme') === 'dark',
   );
 
   useEffect(() => {

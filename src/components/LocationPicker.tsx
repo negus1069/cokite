@@ -68,7 +68,8 @@ export default function LocationPicker({ value, onChange }: Props) {
                       name: `${r.name}${r.admin1 ? ' — ' + r.admin1 : ''}${r.country ? ' (' + r.country + ')' : ''}`,
                       lat: r.latitude,
                       lon: r.longitude,
-                      springRange: 6.0, // default; user can pick a preset for accuracy
+                      springRange: 6.0,
+                      facingDeg: 270, // default west-facing for custom locations
                     });
                     setQuery('');
                     setResults([]);

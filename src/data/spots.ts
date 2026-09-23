@@ -7,13 +7,9 @@ export interface Spot {
   name: string;
   lat: number;
   lon: number;
-  /**
-   * Mean spring-tide range (m) at this location.
-   * Used to approximate the SHOM-style tidal coefficient:
-   *   coef ≈ 100 × (daily_range / springRange)
-   */
   springRange: number;
-  /** Optional live weather-station feed. */
+  /** Direction the spot faces (toward the sea), in degrees. Used to detect offshore wind. */
+  facingDeg: number;
   liveWind?: LiveWindSource;
 }
 
@@ -45,6 +41,7 @@ export const SPOTS: Spot[] = [
     lat: 46.1690,
     lon: -1.2650,
     springRange: 6.0,
+    facingDeg: 0,    // N — faces the sea to the north
     liveWind: RIVEDOUX_WEAMETER,
   },
   {
@@ -53,6 +50,7 @@ export const SPOTS: Spot[] = [
     lat: 46.1555,
     lon: -1.2780,
     springRange: 6.0,
+    facingDeg: 180,  // S
   },
   {
     slug: 'chatelaillon',
@@ -60,6 +58,7 @@ export const SPOTS: Spot[] = [
     lat: 46.0729,
     lon: -1.0885,
     springRange: 6.0,
+    facingDeg: 270,  // W
     liveWind: CHATELAILLON_CLIENTRAW,
   },
   {
@@ -68,5 +67,6 @@ export const SPOTS: Spot[] = [
     lat: 46.1342,
     lon: -1.1183,
     springRange: 6.0,
+    facingDeg: 270,  // W
   },
 ];
