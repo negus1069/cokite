@@ -66,15 +66,15 @@ interface Props {
 
 export default function HomePage({ onSelectSpot }: Props) {
   const today = useMemo(todayISO, []);
-  const days = useMemo(() => [today, addDays(today, 1), addDays(today, 2)], [today]);
+  const days = useMemo(() => Array.from({ length: 10 }, (_, i) => addDays(today, i)), [today]);
 
   const weatherQ = useQuery({
     queryKey: ['weather', REF.lat, REF.lon],
-    queryFn: () => fetchWeather(REF.lat, REF.lon, 7),
+    queryFn: () => fetchWeather(REF.lat, REF.lon, 10),
   });
   const marineQ = useQuery({
     queryKey: ['marine', REF.lat, REF.lon],
-    queryFn: () => fetchMarine(REF.lat, REF.lon, 7),
+    queryFn: () => fetchMarine(REF.lat, REF.lon, 10),
   });
 
   const dateLabel = new Date(`${today}T12:00:00`).toLocaleDateString('fr-FR', {
