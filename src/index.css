@@ -41,15 +41,28 @@ html:not(.dark) footer { border-color: rgb(203 213 225) !important; }
 /* Sticky label column background — adapts to theme */
 .sticky-label-col {
   background-color: rgb(15 23 42) !important; /* slate-900 dark */
-  box-shadow: 2px 0 4px -1px rgba(0,0,0,0.15);
   z-index: 10;
 }
 html:not(.dark) .sticky-label-col {
   background-color: rgb(255 255 255) !important;
-  box-shadow: 2px 0 4px -1px rgba(0,0,0,0.08);
 }
 
-/* Force sticky td to always paint on top of inline-styled siblings */
+/* Label column width */
+table tbody tr > td:first-child,
+table thead tr > th:first-child {
+  width: 1px !important;
+  min-width: 1px !important;
+  max-width: fit-content !important;
+  white-space: nowrap !important;
+  padding-right: 4px !important;
+}
+/* Spot title rows keep a wider label cell */
+table tbody tr.spot-title-row > td:first-child {
+  width: 7rem !important;
+  min-width: 7rem !important;
+  max-width: 7rem !important;
+}
+table tbody tr > td:first-child,
 table tbody tr > td:first-child.sticky-label-col,
 table tbody tr > td.sticky-label-col,
 table thead tr > th.sticky-label-col {
@@ -58,6 +71,7 @@ table thead tr > th.sticky-label-col {
   z-index: 20 !important;
   background-color: rgb(15 23 42) !important;
 }
+html:not(.dark) table tbody tr > td:first-child,
 html:not(.dark) table tbody tr > td:first-child.sticky-label-col,
 html:not(.dark) table tbody tr > td.sticky-label-col,
 html:not(.dark) table thead tr > th.sticky-label-col {

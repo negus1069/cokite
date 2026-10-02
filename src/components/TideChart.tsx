@@ -93,8 +93,8 @@ export default function TideChart({
   const range = maxH - minH || 1;
   const meanH = (minH + maxH) / 2;
 
-  const PAD_TOP = 12;
-  const PAD_BOTTOM = 4;
+  const PAD_TOP = 18;
+  const PAD_BOTTOM = 18;
   const chartH = svgHeight - PAD_TOP - PAD_BOTTOM;
 
   function yFor(h: number): number {
@@ -181,17 +181,18 @@ export default function TideChart({
         const color = isPM ? 'rgb(22 101 52)' : 'rgb(153 27 27)';
         const heightTxt = `${e.height.toFixed(1)}m`;
         const timeTxt = `${String(hh).padStart(2,'0')}h${String(mm).padStart(2,'0')}`;
-        // For PM: labels above the dot; for BM: labels below
-        const baseY = isPM ? Math.max(10, y - 5) : Math.min(svgHeight - 2, y + 9);
+        // PM (high tide): labels below the dot; BM (low tide): labels above the dot
+        const timeY   = isPM ? Math.min(svgHeight - 9, y + 10) : Math.max(9, y - 10);
+        const heightY = isPM ? timeY + 8 : timeY - 8;
         return (
           <g key={e.index}>
             <circle cx={x} cy={y} r={2.5} fill={color} />
-            <text x={x} y={baseY} textAnchor="middle" fontSize={8}
+            <text x={x} y={heightY} textAnchor="middle" fontSize={10}
               fill={color} fontFamily="Inter,system-ui,sans-serif" fontWeight={700}>
               {heightTxt}
             </text>
-            <text x={x} y={isPM ? baseY - 9 : baseY + 9} textAnchor="middle" fontSize={7}
-              fill={color} fontFamily="Inter,system-ui,sans-serif" fontWeight={500} opacity={0.8}>
+            <text x={x} y={timeY} textAnchor="middle" fontSize={9}
+              fill={color} fontFamily="Inter,system-ui,sans-serif" fontWeight={600}>
               {timeTxt}
             </text>
           </g>

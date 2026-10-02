@@ -13,8 +13,9 @@ import {
   waveStyle,
   windStyle,
 } from '../lib/format';
-import { cloudEmoji, isNightHour } from '../lib/weatherCode';
+import { cloudIcon, isNightHour } from '../lib/weatherCode';
 import WindArrow from './WindArrow';
+import WeatherIcon from './WeatherIcon';
 import TideChart from './TideChart';
 
 interface Props {
@@ -174,9 +175,7 @@ export default function ForecastTable({ spot, date, weather, marine }: Props) {
                 const c = wt.cloud_cover[s.iW];
                 const night = isNightHour(wt.time[s.iW]);
                 return cell(
-                  <span title={`${Math.round(c)} %`} className="text-xl">
-                    {cloudEmoji(c, night)}
-                  </span>,
+                  <WeatherIcon icon={cloudIcon(c, night)} label={`${Math.round(c)}%`} size={22} />,
                 );
               })}
             </tr>

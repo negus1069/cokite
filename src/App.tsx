@@ -26,14 +26,10 @@ export default function App() {
   const [view, setView] = useState<'home' | 'detail'>('home');
   const [spot, setSpot] = useState<Spot>(SPOTS[0]);
   const [date, setDate] = useState<string>(todayISO());
-  const [isDark, setIsDark] = useState<boolean>(
-    () => localStorage.getItem('theme') === 'dark',
-  );
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', isDark);
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
-  }, [isDark]);
+    document.documentElement.classList.remove('dark');
+  }, []);
 
   const weatherQ = useQuery({
     queryKey: ['weather', spot.lat, spot.lon],
@@ -53,39 +49,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-slate-800 bg-slate-900/60 backdrop-blur">
-        <div className="max-w-[1400px] mx-auto px-6 py-4 flex items-center gap-3">
-          <button
-            onClick={() => setView('home')}
-            className="focus:outline-none"
-            title="Accueil"
-          >
-            <img src="/cokite/logo.png" alt="Cokite" className="w-9 h-9 rounded-full" />
-          </button>
-          <h1 className="text-xl font-bold">Cokite Forecast</h1>
-          <span className="text-sm text-slate-400">
-            — vent, vagues & marées, sourcé Open-Meteo
-          </span>
-          <div className="ml-auto flex items-center gap-3">
-            {view === 'detail' && (
-              <button
-                onClick={() => setView('home')}
-                className="text-sm text-slate-400 hover:text-slate-200 flex items-center gap-1"
-              >
-                ← Accueil
-              </button>
-            )}
-            <button
-              onClick={() => setIsDark((d) => !d)}
-              className="text-sm px-3 py-1 rounded-full border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition-colors"
-              title={isDark ? 'Passer en mode normal' : 'Passer en mode nuit'}
-            >
-              {isDark ? '☀️ Normal' : '🌙 Nuit'}
-            </button>
-          </div>
-        </div>
-      </header>
-
       <main className="max-w-[1400px] mx-auto px-6 py-6 space-y-6">
         {view === 'home' ? (
           <HomePage
@@ -96,6 +59,12 @@ export default function App() {
           />
         ) : (
           <>
+            <button
+              onClick={() => setView('home')}
+              className="text-sm text-slate-400 hover:text-slate-200 flex items-center gap-1"
+            >
+              ← Accueil
+            </button>
             <section className="flex flex-wrap gap-6 items-end">
               <LocationPicker value={spot} onChange={setSpot} />
               <DatePicker value={date} onChange={setDate} min={minDate} max={maxDate} />

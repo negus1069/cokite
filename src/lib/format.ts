@@ -10,42 +10,50 @@ export function fmtNum(v: number | null | undefined, digits = 0): string {
 }
 
 /**
- * Continuous wind-speed gradient (knots) → inline style.
- *   0..12  kts : blue (hue 220 → 200)
- *  12..20  kts : green (hue 140 → 100)
- *  20..30  kts : orange (hue 40 → 20)
- *  30+     kts : red (hue 10 → 0)
- * Saturation & lightness are tuned so text stays readable on the dark UI.
+ * Wind-speed colour scale (knots), linear 0–40:
+ *   0–10  : white (no colour)
+ *  10–15  : white → deep green
+ *  15–20  : deep green → yellow
+ *  20–30  : yellow → red
+ *  30+    : deep red
  */
-export function windStyle(kts: number): { backgroundColor: string; color: string } {
+export function windStyle(kts: number, opacity = 1): { backgroundColor: string; color: string } {
   const v = Number.isFinite(kts) ? Math.max(0, kts) : 0;
-  let hue: number;
-  let sat = 70;
-  let light = 80;
 
-  if (v <= 12) {
-    const t = v / 12;
-    hue = 200 - 40 * t; // 200 → 160 (light blue → light green)
-    light = 88 - 8 * t; // 88 → 80
-  } else if (v <= 20) {
-    const t = (v - 12) / 8;
-    hue = 130 - 50 * t; // 130 → 80 (green → yellow-green)
-    light = 80 - 10 * t; // 80 → 70
-  } else if (v <= 30) {
-    const t = (v - 20) / 10;
-    hue = 50 - 20 * t; // 50 → 30 (yellow → orange)
-    sat = 80;
-    light = 72 - 12 * t; // 72 → 60
+  if (v < 10) {
+    return { backgroundColor: 'transparent', color: '#1e293b' };
+  }
+
+  // Interpolate between stops: [10,light-green] [15,deep-green] [20,yellow] [30,red]
+  type Stop = [number, [number, number, number]]; // [kts, [h,s,l]]
+  const stops: Stop[] = [
+    [10, [120, 40,  95]],  // near-white green
+    [15, [130, 60,  38]],  // deep green
+    [20, [55,  90,  52]],  // yellow
+    [30, [0,   80,  45]],  // red
+    [40, [0,   80,  30]],  // dark red
+  ];
+
+  let h: number, s: number, l: number;
+
+  if (v >= 40) {
+    [h, s, l] = stops[stops.length - 1][1];
   } else {
-    const t = Math.min(1, (v - 30) / 20);
-    hue = 20 - 20 * t; // 20 → 0 (orange → red)
-    sat = 80;
-    light = 60 - 15 * t; // 60 → 45
+    let i = 0;
+    while (i < stops.length - 2 && v >= stops[i + 1][0]) i++;
+    const [v0, c0] = stops[i];
+    const [v1, c1] = stops[i + 1];
+    const t = (v - v0) / (v1 - v0);
+    h = c0[0] + (c1[0] - c0[0]) * t;
+    s = c0[1] + (c1[1] - c0[1]) * t;
+    l = c0[2] + (c1[2] - c0[2]) * t;
   }
 
   return {
-    backgroundColor: `hsl(${hue.toFixed(0)} ${sat}% ${light.toFixed(0)}%)`,
-    color: light < 60 ? '#fff' : '#1e293b',
+    backgroundColor: opacity < 1
+      ? `hsla(${h.toFixed(0)}, ${s.toFixed(0)}%, ${l.toFixed(0)}%, ${opacity})`
+      : `hsl(${h.toFixed(0)} ${s.toFixed(0)}% ${l.toFixed(0)}%)`,
+    color: opacity < 1 ? '#1e293b' : (l < 55 ? '#fff' : '#1e293b'),
   };
 }
 
@@ -119,10 +127,13 @@ export function waveStyle(m: number): { backgroundColor: string; heightPct: numb
   let sat = 65;
   let light = 82;
 
-  if (v <= 1) {
-    const t = v / 1;
-    hue = 195 - 15 * t; // 195 → 180 (light cyan → light teal)
-    light = 88 - 6 * t; // 88 → 82
+  if (v < 0.7) {
+    return { backgroundColor: 'transparent', heightPct: Math.max(15, Math.min(100, (v / 4) * 100)) };
+  } else if (v <= 1) {
+    const t = (v - 0.7) / 0.3;
+    hue = 195;
+    sat = 40;
+    light = 95 - 7 * t; // 95 → 88 (near-white cyan → light cyan)
   } else if (v <= 2) {
     const t = (v - 1) / 1;
     hue = 160 - 30 * t; // 160 → 130 (teal → green)
@@ -160,15 +171,14 @@ export function periodStyle(s: number): { backgroundColor: string; color: string
   let sat: number;
   let light: number;
 
-  if (v <= 6) {
-    // flat near-white — very short period
-    return { backgroundColor: 'hsl(20 10% 93%)', color: '#94a3b8' };
+  if (v < 8) {
+    return { backgroundColor: 'transparent', color: '#94a3b8' };
   } else if (v <= 10) {
-    // 6–10s: near-white → very light salmon
-    const t = (v - 6) / 4;
+    // 8–10s: near-white → light salmon
+    const t = (v - 8) / 2;
     hue = 20;
     sat = 10 + 30 * t;   // 10 → 40
-    light = 93 - 8 * t;  // 93 → 85
+    light = 95 - 10 * t; // 95 → 85
   } else if (v <= 14) {
     // 10–14s: light salmon → salmon
     const t = (v - 10) / 4;

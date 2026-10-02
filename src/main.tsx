@@ -15,3 +15,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </QueryClientProvider>
   </React.StrictMode>,
 );
+
+// Remove splash once React has painted
+requestAnimationFrame(() =>
+  requestAnimationFrame(() => {
+    const splash = document.getElementById('splash');
+    if (splash) splash.style.animation = 'splash-fade 0.3s ease forwards';
+  })
+);
