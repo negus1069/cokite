@@ -138,12 +138,36 @@ function fmtRange(start: number, end: number): string {
   return `${String(start).padStart(2, '0')}h – ${String(end).padStart(2, '0')}h`;
 }
 
+function findAperoDay(
+  wt: WeatherResponse['hourly'],
+  mt: MarineResponse['hourly'],
+): string | null {
+  // Get all unique dates
+  const dates = [...new Set(wt.time.map(t => t.slice(0, 10)))];
+  for (const date of dates) {
+    // Check daytime hours 12h–20h: no kite wind (< 13 kts) AND no surf (wave < 0.7m or period < 8s)
+    const dayHours = wt.time
+      .map((t, i) => ({ t, i }))
+      .filter(({ t }) => t.startsWith(date) && Number(t.slice(11, 13)) >= 12 && Number(t.slice(11, 13)) <= 20);
+    if (dayHours.length === 0) continue;
+    const hasKite = dayHours.some(({ i }) => wt.wind_speed_10m[i] >= 13);
+    if (hasKite) continue;
+    const marineIdxs = mt.time
+      .map((t, i) => ({ t, i }))
+      .filter(({ t }) => t.startsWith(date) && Number(t.slice(11, 13)) >= 12 && Number(t.slice(11, 13)) <= 20);
+    const hasSurf = marineIdxs.some(({ i }) => mt.wave_height[i] >= 0.7 && mt.wave_period[i] >= 8);
+    if (!hasSurf) return date;
+  }
+  return null;
+}
+
 export default function SessionCards({ weather, marine, spots }: Props) {
   const kiteWindows = findKiteWindows(weather.hourly, spots);
   const surfWindows = findSurfWindows(marine.hourly, weather.hourly);
 
   const nextKite = kiteWindows[0] ?? null;
   const nextSurf = surfWindows[0] ?? null;
+  const aperoDay = findAperoDay(weather.hourly, marine.hourly);
 
   const REF = spots[0];
   const tideExtrema = findExtrema(marine.hourly.time, marine.hourly.sea_level_height_msl);
@@ -282,6 +306,29 @@ export default function SessionCards({ weather, marine, spots }: Props) {
         ) : (
           <div className="text-sm text-slate-400">Pas de session prévue dans les 10 jours</div>
         )}
+        </div>
+      </div>
+
+      {/* Apéro card */}
+      <div className="flex-1 min-w-[240px] bg-white rounded-2xl shadow-sm overflow-hidden flex flex-col">
+        <div className="relative h-32 overflow-hidden">
+          <img
+            src={`${import.meta.env.BASE_URL}apero-session.jpg`}
+            alt="Apéro session"
+            className="w-full h-full object-cover object-[center_30%]"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-slate-900/60" />
+          <span className="absolute bottom-2 left-3 font-semibold text-white uppercase text-xs tracking-wide drop-shadow">Prochain apéro</span>
+        </div>
+        <div className="p-4 flex flex-col gap-3">
+          {aperoDay ? (
+            <>
+              <div className="font-black text-slate-800 capitalize text-left">{fmtDate(aperoDay)}</div>
+              <div className="text-xs text-slate-500">Pas de vent, pas de vagues — c'est l'heure de l'apéro 🥂</div>
+            </>
+          ) : (
+            <div className="text-sm text-slate-400">Pas d'apéro prévu… trop de vent !</div>
+          )}
         </div>
       </div>
     </div>
