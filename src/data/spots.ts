@@ -13,6 +13,25 @@ export interface Spot {
   liveWind?: LiveWindSource;
 }
 
+// Live-station configurations. Adding a new station is one line here.
+const RIVEDOUX_WEAMETER: LiveWindSource = {
+  type: 'weameter',
+  url: 'https://weameter.com/stations/ilederekitesurf/windrt.json',
+  credit: {
+    name: 'weameter.com · Île de Ré Kitesurf',
+    href: 'https://weameter.com/stations/ilederekitesurf/windrt/',
+  },
+};
+
+const CHATELAILLON_CLIENTRAW: LiveWindSource = {
+  type: 'clientraw',
+  url: 'https://www.meteolarochelle.fr/wdlchatel/clientraw.txt',
+  credit: {
+    name: 'meteo-la-rochelle.fr · Port Châtelaillon-Plage',
+    href: 'https://www.meteo-la-rochelle.fr/live-chatelaillon.php',
+  },
+};
+
 // Charente-Maritime spots. Tidal reference port for all of them:
 // La Rochelle-Pallice, mean spring range ≈ 6.0 m.
 export const SPOTS: Spot[] = [
@@ -22,7 +41,8 @@ export const SPOTS: Spot[] = [
     lat: 46.1690,
     lon: -1.2650,
     springRange: 6.0,
-    facingDeg: 0,    // N — faces the sea to the north
+    facingDeg: 0,
+    liveWind: RIVEDOUX_WEAMETER,
   },
   {
     slug: 'rivedoux-sud',
@@ -30,7 +50,7 @@ export const SPOTS: Spot[] = [
     lat: 46.1555,
     lon: -1.2780,
     springRange: 6.0,
-    facingDeg: 180,  // S
+    facingDeg: 180,
   },
   {
     slug: 'chatelaillon',
@@ -38,7 +58,8 @@ export const SPOTS: Spot[] = [
     lat: 46.0729,
     lon: -1.0885,
     springRange: 6.0,
-    facingDeg: 270,  // W
+    facingDeg: 270,
+    liveWind: CHATELAILLON_CLIENTRAW,
   },
   {
     slug: 'aytre',
@@ -46,6 +67,22 @@ export const SPOTS: Spot[] = [
     lat: 46.1342,
     lon: -1.1183,
     springRange: 6.0,
-    facingDeg: 270,  // W
+    facingDeg: 270,
+  },
+  {
+    slug: 'la-palmyre',
+    name: 'La Palmyre',
+    lat: 45.6850,
+    lon: -1.1750,
+    springRange: 5.5,
+    facingDeg: 180,  // S
+  },
+  {
+    slug: 'galon-dor',
+    name: "Galon d'Or",
+    lat: 45.4980,
+    lon: -1.1420,
+    springRange: 5.0,
+    facingDeg: 0,  // N
   },
 ];

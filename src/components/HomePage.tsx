@@ -110,22 +110,24 @@ export default function HomePage({ onSelectSpot }: Props) {
   const wt = weatherQ.data?.hourly;
   const mt = marineQ.data?.hourly;
 
-  // All columns across 3 days
+  const currentHour = useMemo(() => new Date().getHours(), []);
+
+  // All columns across days, starting from current hour on today
   const allCols: ColSpec[] = useMemo(() =>
     days.flatMap((d) =>
-      HOURS.map((h) => ({
+      HOURS.filter((h) => d !== today || h >= currentHour).map((h) => ({
         hour: h,
         date: d,
         iW: wt ? idxFor(wt.time, d, h) : -1,
         iM: mt ? idxFor(mt.time, d, h) : -1,
       }))
     ),
-    [days, wt, mt]
+    [days, wt, mt, today, currentHour]
   );
 
   // Shared label column width
   const LABEL_W = 'sticky left-0 z-10 sticky-label-col';
-  const totalDataCols = HOURS.length * days.length;
+  const totalDataCols = allCols.length;
 
   return (
     <div className="space-y-5">
@@ -186,30 +188,32 @@ export default function HomePage({ onSelectSpot }: Props) {
             {/* Day header row */}
             <tr>
               <th className={`${LABEL_W} sticky left-0 z-10 sticky-label-col`}></th>
-              {days.map((d) => (
-                <th
-                  key={d}
-                  colSpan={HOURS.length}
-                  className={`text-[11px] font-bold text-slate-300 pb-1 pt-2 text-left pl-1 capitalize${days.indexOf(d) > 0 ? ' border-l border-slate-700/50' : ''}`}
-                >
-                  {shortDateLabel(d)}
-                </th>
-              ))}
+              {days.map((d, di) => {
+                const span = allCols.filter(c => c.date === d).length;
+                if (span === 0) return null;
+                return (
+                  <th
+                    key={d}
+                    colSpan={span}
+                    className={`text-[11px] font-bold text-slate-300 pb-1 pt-2 text-left pl-1 capitalize${di > 0 ? ' border-l border-slate-700/50' : ''}`}
+                  >
+                    {shortDateLabel(d)}
+                  </th>
+                );
+              })}
             </tr>
             {/* Hour row */}
             <tr>
               <th className={`${LABEL_W} text-left font-normal text-slate-500 pl-3 pr-2 pb-2 sticky left-0 z-10 sticky-label-col`}></th>
-              {days.flatMap((d) =>
-                HOURS.map((h, hi) => (
-                  <th
-                    key={`${d}-${h}`}
-                    className={`text-[11px] font-semibold text-slate-300 pb-2 text-left pl-1${hi === 0 ? ' border-l border-slate-700/50' : ''}`}
-                    style={{ minWidth: `${COL_W}px` }}
-                  >
-                    {String(h).padStart(2, '0')}h
-                  </th>
-                ))
-              )}
+              {allCols.map(({ date, hour }, ci) => (
+                <th
+                  key={`${date}-${hour}`}
+                  className={`text-[11px] font-semibold text-slate-300 pb-2 text-left pl-1${ci > 0 && allCols[ci-1].date !== date ? ' border-l border-slate-700/50' : ''}`}
+                  style={{ minWidth: `${COL_W}px` }}
+                >
+                  {String(hour).padStart(2, '0')}h
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="[&_tr>td:first-child]:pl-1 [&_tr>td:first-child]:pr-0 [&_tr>td:first-child]:text-left [&_tr>td:first-child]:text-[10px] [&_tr>td:first-child]:leading-tight [&_tr>td:first-child]:sticky [&_tr>td:first-child]:left-0 [&_tr>td:first-child]:z-10 [&_tr>td:first-child]:sticky-label-col">
@@ -238,6 +242,25 @@ export default function HomePage({ onSelectSpot }: Props) {
                   return (
                     <td key={`${date}-${hour}`} className={`p-0 text-center text-[10px] font-semibold${borderClass}`} style={{ backgroundColor: st.backgroundColor, color: '#1e293b' }}>
                       <div className="py-1">{fmtNum(wt.temperature_2m[iW], 0)}</div>
+                    </td>
+                  );
+                })}
+              </tr>
+            )}
+
+            {/* Pluie */}
+            {wt && (
+              <tr>
+                <td className="py-0 text-slate-400">Pluie (mm)</td>
+                {allCols.map(({ hour, date, iW }, ci) => {
+                  const borderClass = ci % HOURS.length === 0 && ci > 0 ? ' border-l border-slate-700/50' : '';
+                  if (iW < 0) return <td key={`${date}-${hour}`} className={borderClass} />;
+                  const v = wt.precipitation[iW];
+                  const bg = v <= 0 ? 'transparent' : v < 1 ? 'hsl(210 60% 85%)' : v < 3 ? 'hsl(210 70% 65%)' : 'hsl(210 80% 45%)';
+                  const color = v >= 3 ? '#fff' : '#1e293b';
+                  return (
+                    <td key={`${date}-${hour}`} className={`p-0 text-center text-[10px] font-semibold${borderClass}`} style={{ backgroundColor: bg, color }}>
+                      <div className="py-1">{v > 0 ? fmtNum(v, 1) : ''}</div>
                     </td>
                   );
                 })}
@@ -317,7 +340,7 @@ function SpotRows({ spot, allCols, hours, days, wt, mt, onSelect }: {
       {/* Spot header row */}
       <tr className="border-t-2 border-slate-700 sticky top-0 z-20 spot-title-row">
         {/* Sticky label cell: spot name */}
-        <td className={`pt-3 pb-0 pl-3 pr-2 sticky left-0 z-30 bg-slate-900 whitespace-nowrap !w-28 !min-w-[7rem]`}>
+        <td className={`pt-3 pb-0 pl-3 pr-2 sticky left-0 z-30 bg-slate-900 whitespace-nowrap !w-36 !min-w-[9rem]`}>
           <div className="flex items-center gap-1.5 py-2">
             <button
               onClick={onSelect}
@@ -325,6 +348,7 @@ function SpotRows({ spot, allCols, hours, days, wt, mt, onSelect }: {
             >
               {spot.name}
             </button>
+            <WindArrow deg={(facingDeg + 180) % 360} className="text-slate-400" size={14} />
           </div>
         </td>
         {/* Remaining columns */}
@@ -334,15 +358,19 @@ function SpotRows({ spot, allCols, hours, days, wt, mt, onSelect }: {
       {/* Day sub-header row */}
       <tr className="sticky top-[2.5rem] z-20">
         <td className="sticky left-0 z-30 bg-slate-900" />
-        {days.map((d, di) => (
-          <td
-            key={`day-${d}`}
-            colSpan={hours.length}
-            className={`text-[11px] font-bold text-slate-300 text-left pl-1 pt-1 bg-slate-900 capitalize${di > 0 ? ' border-l border-slate-700/50' : ''}`}
-          >
-            {shortDateLabel(d)}
-          </td>
-        ))}
+        {days.map((d, di) => {
+          const span = allCols.filter(c => c.date === d).length;
+          if (span === 0) return null;
+          return (
+            <td
+              key={`day-${d}`}
+              colSpan={span}
+              className={`text-[11px] font-bold text-slate-300 text-left pl-1 pt-1 bg-slate-900 capitalize${di > 0 ? ' border-l border-slate-700/50' : ''}`}
+            >
+              {shortDateLabel(d)}
+            </td>
+          );
+        })}
       </tr>
 
       {/* Hour sub-header row */}
@@ -426,7 +454,6 @@ function SpotRows({ spot, allCols, hours, days, wt, mt, onSelect }: {
               {iM >= 0 ? (
                 <div className="flex flex-col items-center">
                   <WindArrow deg={mt.wave_direction[iM]} className="text-cyan-400" size={16} />
-                  <span className="text-[8px] text-slate-500">{degToCardinal(mt.wave_direction[iM])}</span>
                 </div>
               ) : '—'}
             </td>

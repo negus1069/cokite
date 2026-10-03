@@ -58,9 +58,9 @@ table thead tr > th:first-child {
 }
 /* Spot title rows keep a wider label cell */
 table tbody tr.spot-title-row > td:first-child {
-  width: 7rem !important;
-  min-width: 7rem !important;
-  max-width: 7rem !important;
+  width: 9rem !important;
+  min-width: 9rem !important;
+  max-width: 9rem !important;
 }
 table tbody tr > td:first-child,
 table tbody tr > td:first-child.sticky-label-col,
